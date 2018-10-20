@@ -1,0 +1,77 @@
+---
+title: "Mapping Trophic Impact"
+output: github_document
+---
+# Mapping Trophic Impact
+
+Based on the Ecopath model of the North Pacific by Ainsworth (DOI:10.1016/j.ecolmodel.2008.05.005).
+
+R code used to render this network graph. First, load the packages. The tidyverse library is a multi-purpose toolkit for data wrangling. The igraph library is the package used to plot networks.
+
+Second, extract two .csv files that describe the nodes and the edges of the trophic network. Here the nodes are 52 functional groups, and the edges are the mixed trophic impact interactions from Ecopath output.
+
+```{r}
+
+library(tidyverse)
+library(igraph)
+
+nodes <- read.csv("Nodes.csv", header = T, as.is = T)
+positive <- read.csv("MTAPositive.csv", header = T, as.is = T)
+negative <- read.csv("MTANegative.csv", header = T, as.is = T)
+
+positive_impact <- graph_from_data_frame(d = positive, vertices = nodes, directed = T)
+negative_impact <- graph_from_data_frame(d = negative, vertices = nodes, directed = T)
+```
+
+Third, for general housekeeping, remove redundancies and self-loops. Only show links between nodes that are larger than the average link weight to avoid crowding the network and obscure important connections.
+
+Fourth, more housekeeping. Nodes, or vectors (V), their size, label, color, and font is specified to increase clarity in the output graph.
+
+Fifth, for links, or edges (E), the color and width is specified. Here the with is condition to the weight of the particular link in relation to others, highlighted by squaring the weigths.
+
+## Postive Net Trophic Impact
+
+```{r}
+
+positive_cutoff <- mean(positive$Weight)
+positive_netoff <- delete_edges(positive_impact, E(positive_impact)[Weight < positive_cutoff])
+positive_net <- simplify(positive_netoff, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = igraph_opt("edge.attr.comb"))
+
+V(positive_net)$vertex.size <- 0.01
+V(positive_net)$label.cex <- .3
+V(positive_net)$label.family <- "mono"
+V(positive_net)$label.color <- "black"
+V(positive_net)$size <- .0001
+V(positive_net)$label <- (V(positive_net)$functionalGroup)
+
+E(positive_net)$width <- 5 * (E(positive_impact)$Weight^4)
+E(positive_net)$color <- "orange"
+E(positive_net)$arrow.size <- 0.00005
+
+graph_attr(positive_net, "layout") <- layout.circle(positive_net)
+
+plot(positive_net)
+```
+## Negative Net Trophic Impact
+
+```{r}
+
+negative_cutoff <- mean(negative$Weight)
+negative_netoff <- delete_edges(negative_impact, E(negative_impact)[Weight < negative_cutoff])
+negative_net <- simplify(negative_netoff, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = igraph_opt("edge.attr.comb"))
+
+V(negative_net)$vertex.size <- 0.01
+V(negative_net)$label.cex <- .3
+V(negative_net)$label.family <- "mono"
+V(negative_net)$label.color <- "black"
+V(negative_net)$size <- .0001
+V(negative_net)$label <- V(negative_net)$functionalGroup
+
+E(negative_net)$width <- 999999999999 * (E(negative_impact)$Weight^4)
+E(negative_net)$color <- "skyblue"
+E(negative_net)$arrow.size <- 0.00005
+
+graph_attr(negative_net, "layout") <- layout.circle(negative_net)
+
+plot(negative_net)
+```
