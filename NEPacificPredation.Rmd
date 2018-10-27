@@ -1,0 +1,142 @@
+---
+output: github_document
+---
+
+# Mapping Predation
+
+## The Northeastern Pacific Ecosystem
+
+Based on the Ecopath model of the North Pacific by Ainsworth (DOI:10.1016/j.ecolmodel.2008.05.005). Networks are made by interconnecting vertices. The .csv data to assign the network nodes. Each node is an ecosystem functional group (e.g. Phytoplankton, Krill, Sharks, Cephalopods, Whales, etc). There are 52 functional groups in this ecosystem model.
+
+To begin, the first step is to load the R packages required to plot the network.
+
+```{r}
+suppressMessages(library(igraph))
+suppressMessages(library(tidyverse))
+suppressMessages(library(knitr))
+suppressMessages(library(rmarkdown))
+```
+
+From the .csv file the `nodes` dataset is created, which has four variables. ID gives the 52 functional groups a unique code that simplyfies network construction. Functional groups can are sorted ascendingly by trophic level.
+
+```{r}
+nodes <- read.csv("NEPacific_Nodes.csv", header = T, as.is = T)
+```
+
+### Ecosystem Summary
+
+Here is a summary table of the functional groups defined by the `nodes` dataset.
+
+```{r}
+NorthPacificSummary <- nodes %>%
+  rename("ID" = id) %>%
+  rename("Functional Groups" = functionalGroup) %>%
+  rename("Category" = category) %>%
+  rename("Trophic Level" = trophicLevel)
+knitr::kable(NorthPacificSummary)
+```
+
+### Color coding
+
+Functional groups can be color coded in accordance to trophic level. Lower trophic levels are `red` defined as `#FF0000 and rgb(1,0,0,0.5)`, upper trophic levels are `gold` defined as `#FFD700 and rgb(1,0.843,0,0.5)` at 50% alpha level, the last RGB dimension.
+
+Alpha channel at 100% for functional group labels.
+
+```{r}
+colors <- colorRampPalette(c(rgb(1,0,0,1), rgb(1,0.843,0,1)), alpha = TRUE)
+colors(13)
+```
+
+```{r}
+#par(bg="black")
+plot(rep(1, 52), col = colors(52), pch = 19, cex = 5)
+```
+
+Alpha channel at 33% for links betwen functional groups
+
+```{r}
+colorsAlpha <- colorRampPalette(c(rgb(1,0,0,0.33), rgb(1,0.843,0,0.33)), alpha = TRUE)
+colorsAlpha(13)
+```
+
+```{r}
+#par(bg="black")
+plot(rep(1, 52), col = colorsAlpha(52), pch = 19, cex = 5)
+```
+
+Loading the .csv data to assign the network links. Each node has a diet of prey items, which are other nodes in the network. The collection of diets forms the food web.
+
+```{r}
+diet <- read.csv("NEPacificDiet.csv", header = T, as.is = T)
+```
+
+Generating a graph object from the functional group nodes and diet links.
+
+```{r}
+diet_plot <- graph_from_data_frame(d = diet, vertices = nodes, directed = T)
+```
+
+## Plotting
+
+Step 1 removes links that weight less than the average of all weights for that plot. Redundancies and loops are removed as well.
+
+Step 2 defines the node labels, using the functional group names. Font, font size, and vertex dot size is specified.
+
+Step 3 defines the links between nodes. Here the weights are squared and the result is amplified by a factor of 5, so that the relative width of links can be visually comparable.
+
+Step 4 plots the network. The layout of the plot is specified.
+
+```{r}
+# Step 1
+positive_net <- igraph::simplify(diet_plot, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = igraph_opt("edge.attr.comb"))
+# Step 2
+V(positive_net)$vertex.size <- 0.01
+V(positive_net)$label.cex <- 0.45
+V(positive_net)$label.family <- "Lato Medium"
+V(positive_net)$label.color <- as.character(cut(V(diet_plot)$Number,
+breaks = c(0,4,8,12,16,20,24,28,32,36,40,44,48,52), labels = c(colors(13))))
+V(positive_net)$size <- .0001
+V(positive_net)$label <- (V(positive_net)$functionalGroup)
+# Step 3
+E(positive_net)$width <- 0.8
+E(positive_net)$arrow.size <- 0.00005
+```
+
+### Predator Perspective
+
+```{r}
+E(positive_net)$color <- as.character(cut(E(diet_plot)$FromWeight, breaks = c(0,4,8,12,16,20,24,28,32,36,40,44,48,52), labels = c(colorsAlpha(13))))
+```
+
+
+```{r, fig.height=7, fig.width=7, dpi=600}
+# Step 4
+graph_attr(positive_net, "layout") <- layout_with_kk(positive_net)
+#par(bg="black")
+plot(positive_net)
+```
+
+```{r, fig.height=7, fig.width=7, dpi=600}
+# Step 4
+graph_attr(positive_net, "layout") <- layout.circle(positive_net)
+#par(bg="black")
+plot(positive_net)
+```
+
+### Prey Perspective
+
+```{r}
+E(positive_net)$color <- as.character(cut(E(diet_plot)$ToWeight, breaks = c(0,4,8,12,16,20,24,28,32,36,40,44,48,52), labels = c(colorsAlpha(13))))
+```
+
+```{r, fig.height=7, fig.width=7, dpi=600}
+graph_attr(positive_net, "layout") <- layout_with_kk(positive_net)
+#par(bg="black")
+plot(positive_net)
+```
+
+```{r, fig.height=7, fig.width=7, dpi=600}
+graph_attr(positive_net, "layout") <- layout.circle(positive_net)
+#par(bg="black")
+plot(positive_net)
+```
